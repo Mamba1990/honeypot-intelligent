@@ -1,0 +1,50 @@
+services:
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: cowrie
+    restart: unless-stopped
+    ports:
+      - "2222:2222"
+    volumes:
+      # on monte /cowrie/var (plus fiable) pour récupérer les logs
+      - cowrie-data:/cowrie/var
+      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - ./cowrie/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
+
+  webhoneypot:
+    build: ./webhoneypot
+    container_name: webhoneypot
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    volumes:
+      - webhoneypot-logs:/app/logs
+
+  collector:
+    build: ./collector
+    container_name: collector
+    restart: unless-stopped
+    depends_on:
+      - webhoneypot
+      - cowrie
+    volumes:
+      - webhoneypot-logs:/web/logs:ro
+      # le collector lit les logs cowrie via /cowrie/var
+      - cowrie-data:/cowrie/var:ro
+      - ./db:/db
+
+  api:
+    build: ./api
+    container_name: api
+    restart: unless-stopped
+    depends_on:
+      - collector
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./db:/db:ro
+
+volumes:
+  webhoneypot-logs:
+  cowrie-data:
+
