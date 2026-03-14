@@ -6,7 +6,6 @@ services:
     ports:
       - "2222:2222"
     volumes:
-      # on monte /cowrie/var (plus fiable) pour récupérer les logs
       - cowrie-data:/cowrie/var
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
       - ./cowrie/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
@@ -29,9 +28,9 @@ services:
       - cowrie
     volumes:
       - webhoneypot-logs:/web/logs:ro
-      # le collector lit les logs cowrie via /cowrie/var
       - cowrie-data:/cowrie/var:ro
       - ./db:/db
+      - ./ml:/app/ml:ro  # ML model + scripts accessibles
 
   api:
     build: ./api
@@ -43,8 +42,9 @@ services:
       - "8000:8000"
     volumes:
       - ./db:/db:ro
+    environment:
+      - API_KEY=honeypot-secret-key
 
 volumes:
   webhoneypot-logs:
   cowrie-data:
-
