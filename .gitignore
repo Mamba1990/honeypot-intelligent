@@ -20,6 +20,17 @@ ENV/
 logs/
 *.jsonl
 
+# ML data
+ml/data/
+*.jsonl
+
+# ML models (optionnel si trop gros)
+*.joblib
+*.pkl
+
+# Jupyter
+.ipynb_checkpoints/
+
 #----------------------------------#
 # Database
 #----------------------------------#
