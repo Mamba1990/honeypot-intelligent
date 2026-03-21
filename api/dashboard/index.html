@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Honeypot Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #34d399;
+      --danger: #f87171;
+      --warn: #fbbf24;
+      --border: #334155;
+      --radius: 16px;
+      --shadow: 0 10px 25px rgba(0,0,0,.25);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+
+    .title h1 {
+      margin: 0;
+      color: white;
+      font-size: 2rem;
+    }
+
+    .title p {
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .input-api {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0b1220;
+      color: white;
+      min-width: 220px;
+    }
+
+    .btn {
+      border: none;
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: var(--shadow);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #082f49;
+    }
+
+    .btn-secondary {
+      background: #1e293b;
+      color: white;
+      border: 1px solid var(--border);
+    }
+
+    .grid-kpi {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: rgba(17,24,39,.92);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .kpi-title {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+    }
+
+    .kpi-value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: white;
+    }
+
+    .grid-main, .grid-bottom {
+      display: grid;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .grid-main {
+      grid-template-columns: 1.1fr 1fr;
+    }
+
+    .grid-bottom {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .card h2 {
+      margin-top: 0;
+      color: white;
+      font-size: 1.15rem;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .bars {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 160px 1fr 50px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .bar-label {
+      color: var(--text);
+      font-size: 0.92rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 12px;
+      background: #0b1220;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      border-radius: 999px;
+    }
+
+    .bar-value {
+      text-align: right;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: bold;
+      border: 1px solid transparent;
+    }
+
+    .badge-http {
+      background: rgba(56,189,248,.15);
+      color: #7dd3fc;
+      border-color: rgba(56,189,248,.35);
+    }
+
+    .badge-ssh {
+      background: rgba(52,211,153,.15);
+      color: #6ee7b7;
+      border-color: rgba(52,211,153,.35);
+    }
+
+    .badge-alert {
+      background: rgba(248,113,113,.15);
+      color: #fca5a5;
+      border-color: rgba(248,113,113,.35);
+    }
+
+    .severity {
+      font-weight: bold;
+    }
+
+    .sev-high { color: var(--danger); }
+    .sev-med { color: var(--warn); }
+    .sev-low { color: var(--accent-2); }
+
+    .status {
+      margin-top: 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 10px 0;
+    }
+
+    .footer {
+      text-align: center;
+      color: var(--muted);
+      margin-top: 20px;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 1100px) {
+      .grid-kpi { grid-template-columns: repeat(2, 1fr); }
+      .grid-main, .grid-bottom { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 700px) {
+      .grid-kpi { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 110px 1fr 40px; }
+      .title h1 { font-size: 1.5rem; }
+      .input-api { min-width: 180px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title">
+        <h1>Honeypot Intelligent Dashboard</h1>
+        <p>Visualisation des incidents, alertes et anomalies Machine Learning</p>
+      </div>
+
+      <div class="actions">
+        <input
+          id="apiKeyInput"
+          class="input-api"
+          type="password"
+          placeholder="X-API-Key"
+          value="honeypot-secret-key"
+        />
+        <button class="btn btn-secondary" onclick="saveKey()">Sauvegarder la clé</button>
+        <button class="btn btn-primary" onclick="loadDashboard()">Actualiser</button>
+      </div>
+    </div>
+
+    <div class="status" id="statusMsg">Prêt.</div>
+
+    <div class="grid-kpi">
+      <div class="card">
+        <div class="kpi-title">Incidents totaux</div>
+        <div class="kpi-value" id="kpi-total-incidents">-</div>
+      </div>
+      <div class="card">
+        <div class="kpi-title">Alertes totales</div>
+        <div class="kpi-value" id="kpi-total-alerts">-</div>
+      </div>
+      <div class="card">
+        <div class="kpi-title">Incidents HTTP</div>
+        <div class="kpi-value" id="kpi-http">-</div>
+      </div>
+      <div class="card">
+        <div class="kpi-title">Incidents SSH</div>
+        <div class="kpi-value" id="kpi-ssh">-</div>
+      </div>
+      <div class="card">
+        <div class="kpi-title">Anomalies ML</div>
+        <div class="kpi-value" id="kpi-ml">-</div>
+      </div>
+    </div>
+
+    <div class="grid-main">
+      <div class="card">
+        <h2>Top catégories</h2>
+        <p class="muted">Catégories d’incidents les plus fréquentes</p>
+        <div id="top-categories" class="bars"></div>
+      </div>
+
+      <div class="card">
+        <h2>Top IPs</h2>
+        <p class="muted">Sources les plus actives</p>
+        <div id="top-ips" class="bars"></div>
+      </div>
+    </div>
+
+    <div class="grid-bottom">
+      <div class="card">
+        <h2>Incidents récents</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Horodatage</th>
+              <th>IP</th>
+              <th>Service</th>
+              <th>Catégorie</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody id="recent-incidents-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Alertes récentes</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Horodatage</th>
+              <th>IP</th>
+              <th>Type</th>
+              <th>Sévérité</th>
+            </tr>
+          </thead>
+          <tbody id="recent-alerts-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Types d’alertes</h2>
+      <p class="muted">Répartition des alertes générées</p>
+      <div id="alert-types" class="bars"></div>
+    </div>
+
+    <div class="footer">
+      Dashboard de démonstration – Honeypot Intelligent SSH/HTTP + ML + RBA
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "honeypot_api_key";
+
+    function getApiKey() {
+      return localStorage.getItem(STORAGE_KEY) || document.getElementById("apiKeyInput").value.trim();
+    }
+
+    function saveKey() {
+      const value = document.getElementById("apiKeyInput").value.trim();
+      localStorage.setItem(STORAGE_KEY, value);
+      document.getElementById("statusMsg").textContent = "Clé API sauvegardée localement dans le navigateur.";
+    }
+
+    function initKey() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        document.getElementById("apiKeyInput").value = saved;
+      }
+    }
+
+    function formatDate(v) {
+      if (!v) return "-";
+      try {
+        return new Date(v).toLocaleString();
+      } catch {
+        return v;
+      }
+    }
+
+    function severityClass(v) {
+      if (v >= 80) return "sev-high";
+      if (v >= 60) return "sev-med";
+      return "sev-low";
+    }
+
+    function renderBars(containerId, items, labelKey, valueKey) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div class="empty">Aucune donnée disponible</div>';
+        return;
+      }
+
+      const max = Math.max(...items.map(x => Number(x[valueKey] || 0)), 1);
+
+      items.forEach(item => {
+        const value = Number(item[valueKey] || 0);
+        const pct = (value / max) * 100;
+
+        const row = document.createElement("div");
+        row.className = "bar-row";
+        row.innerHTML = `
+          <div class="bar-label">${item[labelKey] ?? "-"}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${pct}%"></div>
+          </div>
+          <div class="bar-value">${value}</div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function renderIncidents(items) {
+      const body = document.getElementById("recent-incidents-body");
+      body.innerHTML = "";
+
+      if (!items || items.length === 0) {
+        body.innerHTML = '<tr><td colspan="6" class="empty">Aucun incident</td></tr>';
+        return;
+      }
+
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${item.id ?? "-"}</td>
+          <td>${formatDate(item.timestamp)}</td>
+          <td>${item.source_ip ?? "-"}</td>
+          <td><span class="badge ${item.service === "ssh" ? "badge-ssh" : "badge-http"}">${item.service ?? "-"}</span></td>
+          <td>${item.category ?? "-"}</td>
+          <td>${item.score ?? "-"}</td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    function renderAlerts(items) {
+      const body = document.getElementById("recent-alerts-body");
+      body.innerHTML = "";
+
+      if (!items || items.length === 0) {
+        body.innerHTML = '<tr><td colspan="5" class="empty">Aucune alerte</td></tr>';
+        return;
+      }
+
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${item.id ?? "-"}</td>
+          <td>${formatDate(item.timestamp)}</td>
+          <td>${item.source_ip ?? "-"}</td>
+          <td><span class="badge badge-alert">${item.alert_type ?? "-"}</span></td>
+          <td class="severity ${severityClass(item.severity ?? 0)}">${item.severity ?? "-"}</td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    async function loadDashboard() {
+      const apiKey = getApiKey();
+      const status = document.getElementById("statusMsg");
+      status.textContent = "Chargement...";
+
+      try {
+        const res = await fetch("/dashboard-data", {
+          headers: {
+            "X-API-Key": apiKey
+          }
+        });
+
+        if (res.status === 401) {
+          status.textContent = "Clé API invalide ou absente.";
+          return;
+        }
+
+        if (!res.ok) {
+          status.textContent = "Erreur lors du chargement du dashboard.";
+          return;
+        }
+
+        const data = await res.json();
+
+        document.getElementById("kpi-total-incidents").textContent = data.summary.total_incidents ?? 0;
+        document.getElementById("kpi-total-alerts").textContent = data.summary.total_alerts ?? 0;
+        document.getElementById("kpi-http").textContent = data.summary.http_incidents ?? 0;
+        document.getElementById("kpi-ssh").textContent = data.summary.ssh_incidents ?? 0;
+        document.getElementById("kpi-ml").textContent = data.summary.ml_anomalies ?? 0;
+
+        renderBars("top-categories", data.top_categories, "category", "cnt");
+        renderBars("top-ips", data.top_ips, "source_ip", "cnt");
+        renderBars("alert-types", data.alert_types, "alert_type", "cnt");
+
+        renderIncidents(data.recent_incidents);
+        renderAlerts(data.recent_alerts);
+
+        status.textContent = "Dashboard chargé avec succès.";
+      } catch (e) {
+        console.error(e);
+        status.textContent = "Erreur réseau ou serveur.";
+      }
+    }
+
+    initKey();
+    loadDashboard();
+    setInterval(loadDashboard, 15000);
+  </script>
+</body>
+</html>
