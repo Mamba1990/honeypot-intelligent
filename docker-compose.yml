@@ -26,11 +26,13 @@ services:
     depends_on:
       - webhoneypot
       - cowrie
+    environment:
+      - PYTHONUNBUFFERED=1
     volumes:
       - webhoneypot-logs:/web/logs:ro
       - cowrie-data:/cowrie/var:ro
       - ./db:/db
-      - ./ml:/app/ml:ro  # ML model + scripts accessibles
+      - ./ml:/app/ml:ro
 
   api:
     build: ./api
@@ -44,6 +46,70 @@ services:
       - ./db:/db:ro
     environment:
       - API_KEY=honeypot-secret-key
+
+  httpgen-normal:
+    build:
+      context: ./traffic_generator
+    container_name: httpgen-normal
+    restart: "no"
+    profiles: ["generator"]
+    depends_on:
+      - webhoneypot
+    command: ["python", "/app/http_generator.py"]
+    environment:
+      BASE_URL: http://webhoneypot:8081
+      MODE: normal
+      COUNT: 300
+      DELAY_MIN: 0.1
+      DELAY_MAX: 0.5
+
+  httpgen-suspicious:
+    build:
+      context: ./traffic_generator
+    container_name: httpgen-suspicious
+    restart: "no"
+    profiles: ["generator"]
+    depends_on:
+      - webhoneypot
+    command: ["python", "/app/http_generator.py"]
+    environment:
+      BASE_URL: http://webhoneypot:8081
+      MODE: suspicious
+      COUNT: 200
+      DELAY_MIN: 0.05
+      DELAY_MAX: 0.2
+
+  sshgen-normal:
+    build:
+      context: ./traffic_generator
+    container_name: sshgen-normal
+    restart: "no"
+    profiles: ["generator"]
+    depends_on:
+      - cowrie
+    command: ["python", "/app/ssh_log_generator.py"]
+    environment:
+      MODE: normal
+      COUNT: 300
+      OUT: /cowrie/var/log/cowrie/cowrie.json
+    volumes:
+      - cowrie-data:/cowrie/var
+
+  sshgen-suspicious:
+    build:
+      context: ./traffic_generator
+    container_name: sshgen-suspicious
+    restart: "no"
+    profiles: ["generator"]
+    depends_on:
+      - cowrie
+    command: ["python", "/app/ssh_log_generator.py"]
+    environment:
+      MODE: suspicious
+      COUNT: 300
+      OUT: /cowrie/var/log/cowrie/cowrie.json
+    volumes:
+      - cowrie-data:/cowrie/var
 
 volumes:
   webhoneypot-logs:
