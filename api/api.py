@@ -1,4 +1,3 @@
-
 import json
 import sqlite3
 import os
@@ -14,18 +13,11 @@ DASHBOARD_HTML = BASE_DIR / "dashboard" / "index.html"
 
 app = FastAPI(title="Honeypot Intelligent - API")
 
-# ---- Simple API Key (MVP) ----
 API_KEY = os.getenv("API_KEY", "honeypot-secret-key")
-
-# 🔑 Déclare la clé API pour Swagger (bouton Authorize)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def check_api_key(api_key: str = Security(api_key_header)):
-    """
-    Vérifie la clé API envoyée via:
-      X-API-Key: <clé>
-    """
     if api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -46,7 +38,6 @@ def query_db(sql, params=()):
 
 
 def parse_json_if_possible(value):
-    """Transforme un champ TEXT contenant du JSON en dict/list."""
     if value is None:
         return None
     if isinstance(value, (dict, list)):
@@ -77,7 +68,9 @@ def root():
         "dashboard": "/dashboard",
         "endpoints": [
             "/incidents",
+            "/incidents/{incident_id}",
             "/alerts",
+            "/alerts/{alert_id}",
             "/stats",
             "/dashboard-data",
             "/dashboard",
@@ -120,6 +113,28 @@ def incident_detail(incident_id: int, _=Depends(check_api_key)):
     return row
 
 
+@app.get("/alerts")
+def list_alerts(limit: int = 50, _=Depends(check_api_key)):
+    rows = query_db(
+        "SELECT id, timestamp, source_ip, alert_type, severity, details FROM alerts ORDER BY id DESC LIMIT ?",
+        (limit,)
+    )
+    for r in rows:
+        r["details"] = parse_json_if_possible(r.get("details"))
+    return {"items": rows}
+
+
+@app.get("/alerts/{alert_id}")
+def alert_detail(alert_id: int, _=Depends(check_api_key)):
+    rows = query_db("SELECT * FROM alerts WHERE id = ?", (alert_id,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="not found")
+
+    row = rows[0]
+    row["details"] = parse_json_if_possible(row.get("details"))
+    return row
+
+
 @app.get("/stats")
 def stats(_=Depends(check_api_key)):
     top_ips = query_db("""
@@ -138,17 +153,6 @@ def stats(_=Depends(check_api_key)):
         LIMIT 10
     """)
     return {"top_ips": top_ips, "top_categories": top_categories}
-
-
-@app.get("/alerts")
-def list_alerts(limit: int = 50, _=Depends(check_api_key)):
-    rows = query_db(
-        "SELECT id, timestamp, source_ip, alert_type, severity, details FROM alerts ORDER BY id DESC LIMIT ?",
-        (limit,)
-    )
-    for r in rows:
-        r["details"] = parse_json_if_possible(r.get("details"))
-    return {"items": rows}
 
 
 @app.get("/iocs/{incident_id}")

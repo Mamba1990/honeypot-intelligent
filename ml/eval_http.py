@@ -1,60 +1,156 @@
-import json, os
+import json
+import os
 import numpy as np
 import joblib
 import matplotlib.pyplot as plt
+
 from feature_extraction import featurize_http
 
-DATA_PATH = os.path.join("data", "http_events.jsonl")
+DATA_PATH  = os.path.join("data", "http_events.jsonl")
 MODEL_PATH = "model_http.joblib"
 
+# ✅ Même filtre que train_http.py — retire le bruit inutile
+# ❌ Pas de déduplication — on veut la vraie distribution de production
+BORING_PATHS = {
+    "/", "/index.html", "/about", "/contact", "/api/health"
+}
+STATIC_EXTENSIONS = (
+    ".css", ".js", ".png", ".jpg", ".jpeg", ".gif",
+    ".svg", ".ico", ".woff", ".woff2", ".ttf"
+)
+IGNORED_METHODS = {"HEAD", "OPTIONS"}
+
+
+def is_boring_http_event(evt: dict) -> bool:
+    path   = (evt.get("path")       or "").strip().lower()
+    method = (evt.get("method")     or "").strip().upper()
+    query  = (evt.get("query")      or "").strip()
+    body   = (evt.get("body")       or "").strip()
+    ua     = (evt.get("user_agent") or "").strip()
+
+    if not path:
+        return True
+    if method in IGNORED_METHODS:
+        return True
+    if path.endswith(STATIC_EXTENSIONS):
+        return True
+    if path in BORING_PATHS and not query and not body:
+        return True
+    if not ua and not query and not body:
+        return True
+    return False
+
+
 def load_X():
+    """
+    Charge tous les events HTTP filtrés (sans déduplication).
+    Filtrés  → métriques cohérentes avec ce que le modèle sait évaluer.
+    Non dédupliqués → distribution réelle de production conservée.
+    """
+    if not os.path.exists(DATA_PATH):
+        raise FileNotFoundError(f"Fichier introuvable: {DATA_PATH}")
+
     X, raw = [], []
+    kept = skipped = 0
+
     with open(DATA_PATH, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
-            line=line.strip()
-            if not line: 
+            line = line.strip()
+            if not line:
                 continue
             try:
                 evt = json.loads(line)
-            except:
+            except json.JSONDecodeError:
+                skipped += 1
                 continue
-            X.append(featurize_http(evt))
-            raw.append(evt)
+
+            # ✅ Filtre bruit — même logique que train_http
+            if is_boring_http_event(evt):
+                skipped += 1
+                continue
+
+            try:
+                feats = featurize_http(evt)
+                if not np.all(np.isfinite(feats)):
+                    skipped += 1
+                    continue
+                X.append(feats)
+                raw.append(evt)
+                kept += 1
+            except Exception:
+                skipped += 1
+                continue
+
+    print(f"[eval_http] events kept={kept} skipped={skipped}")
     return np.array(X, dtype=float), raw
+
 
 def main():
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError("model_http.joblib introuvable. Lance train_http.py d'abord.")
+
     X, raw = load_X()
+    n = len(X)
+
+    if n == 0:
+        print("[eval_http] Aucun event apres filtrage.")
+        return
+
     model = joblib.load(MODEL_PATH)
 
+    # ✅ Verification coherence dimensions
+    expected = model.n_features_in_
+    if X.shape[1] != expected:
+        raise ValueError(
+            f"Incompatibilite features : X a {X.shape[1]} dims "
+            f"mais le modele attend {expected} dims. "
+            f"Reentraine le modele avec train_http.py."
+        )
+
     scores = model.score_samples(X)
-    preds = model.predict(X)  # -1 anomalie
+    preds  = model.predict(X)   # -1 anomalie, 1 normal
 
     anomaly_ratio = (preds == -1).sum() / len(preds)
 
-    print("=== HTTP ML METRICS ===")
-    print("samples:", len(X))
-    print("anomaly_ratio:", round(anomaly_ratio, 4))
-    print("score mean/min/max:", float(scores.mean()), float(scores.min()), float(scores.max()))
-    print("percentiles:", {p: float(np.percentile(scores, p)) for p in [1,5,10,25,50,75,90,95,99]})
+    print("\n=== HTTP ML METRICS ===")
+    print(f"samples           : {n}")
+    print(f"features          : {X.shape[1]}")
+    print(f"anomaly_ratio     : {round(anomaly_ratio, 4)}")
+    print(f"score mean        : {scores.mean():.4f}")
+    print(f"score min         : {scores.min():.4f}")
+    print(f"score max         : {scores.max():.4f}")
 
-    # top 5 anomalies
+    print("\nPercentiles:")
+    for p in [1, 5, 10, 25, 50, 75, 90, 95, 99]:
+        print(f"  p{p:02d} = {np.percentile(scores, p):.4f}")
+
+    # Top 5 anomalies
     idx = np.argsort(scores)[:5]
-    print("\nTop 5 anomalies:")
+    print("\nTop 5 anomalies (scores les plus bas):")
     for i in idx:
         evt = raw[i]
-        print("-", "path=", evt.get("path"), "query=", evt.get("query"), "score=", float(scores[i]))
+        print(
+            f"  score={scores[i]:.4f}"
+            f"  path={evt.get('path', '')}"
+            f"  query={str(evt.get('query', ''))[:60]}"
+            f"  ua={str(evt.get('user_agent', ''))[:40]}"
+        )
 
-    # plot histogram
-    plt.figure()
-    plt.hist(scores, bins=50)
+    # ✅ Histogramme avec seuil visuel
+    threshold = np.percentile(scores, 5)  # ~5% anomalies
+    plt.figure(figsize=(10, 5))
+    plt.hist(scores[preds == 1],  bins=40, alpha=0.7, color="#2980b9", label="Normal")
+    plt.hist(scores[preds == -1], bins=40, alpha=0.7, color="#e74c3c", label="Anomalie")
+    plt.axvline(threshold, color="orange", linestyle="--", linewidth=1.5,
+                label=f"p5 = {threshold:.3f}")
     plt.title("HTTP score_samples distribution (IsolationForest)")
     plt.xlabel("score_samples")
     plt.ylabel("count")
+    plt.legend()
     plt.tight_layout()
     plt.savefig("http_scores_hist.png")
     print("\nSaved graph -> http_scores_hist.png")
+
 
 if __name__ == "__main__":
     main()
