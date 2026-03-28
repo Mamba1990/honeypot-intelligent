@@ -257,6 +257,68 @@
       font-size: 0.9rem;
     }
 
+    .clickable-row {
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .clickable-row:hover {
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .modal {
+      width: min(900px, 92vw);
+      max-height: 85vh;
+      overflow: auto;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      color: white;
+    }
+
+    .modal-close {
+      background: transparent;
+      color: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .modal pre {
+      background: #020617;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      color: #cbd5e1;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
     @media (max-width: 1100px) {
       .grid-kpi { grid-template-columns: repeat(2, 1fr); }
       .grid-main, .grid-bottom { grid-template-columns: 1fr; }
@@ -376,6 +438,16 @@
     </div>
   </div>
 
+  <div id="detailModalBackdrop" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="detailModalTitle">Détail</h3>
+        <button class="modal-close" onclick="closeModal()">Fermer</button>
+      </div>
+      <div id="detailModalContent"></div>
+    </div>
+  </div>
+
   <script>
     const STORAGE_KEY = "honeypot_api_key";
 
@@ -450,6 +522,9 @@
 
       items.forEach(item => {
         const tr = document.createElement("tr");
+        tr.className = "clickable-row";
+        tr.onclick = () => openIncidentDetail(item.id);
+
         tr.innerHTML = `
           <td>${item.id ?? "-"}</td>
           <td>${formatDate(item.timestamp)}</td>
@@ -473,6 +548,9 @@
 
       items.forEach(item => {
         const tr = document.createElement("tr");
+        tr.className = "clickable-row";
+        tr.onclick = () => openAlertDetail(item.id);
+
         tr.innerHTML = `
           <td>${item.id ?? "-"}</td>
           <td>${formatDate(item.timestamp)}</td>
@@ -482,6 +560,83 @@
         `;
         body.appendChild(tr);
       });
+    }
+
+    function openModal(title, data) {
+      document.getElementById("detailModalTitle").textContent = title;
+      document.getElementById("detailModalContent").innerHTML = `
+        <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+      `;
+      document.getElementById("detailModalBackdrop").style.display = "flex";
+    }
+
+    function closeModal() {
+      document.getElementById("detailModalBackdrop").style.display = "none";
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    async function openIncidentDetail(id) {
+      const apiKey = getApiKey();
+      const status = document.getElementById("statusMsg");
+      status.textContent = `Chargement incident #${id}...`;
+
+      try {
+        const res = await fetch(`/incidents/${id}`, {
+          headers: { "X-API-Key": apiKey }
+        });
+
+        if (res.status === 401) {
+          status.textContent = "Clé API invalide ou absente.";
+          return;
+        }
+
+        if (!res.ok) {
+          status.textContent = "Impossible de charger le détail de l’incident.";
+          return;
+        }
+
+        const data = await res.json();
+        openModal(`Incident #${id}`, data);
+        status.textContent = `Incident #${id} chargé.`;
+      } catch (e) {
+        console.error(e);
+        status.textContent = "Erreur réseau lors du chargement de l’incident.";
+      }
+    }
+
+    async function openAlertDetail(id) {
+      const apiKey = getApiKey();
+      const status = document.getElementById("statusMsg");
+      status.textContent = `Chargement alerte #${id}...`;
+
+      try {
+        const res = await fetch(`/alerts/${id}`, {
+          headers: { "X-API-Key": apiKey }
+        });
+
+        if (res.status === 401) {
+          status.textContent = "Clé API invalide ou absente.";
+          return;
+        }
+
+        if (!res.ok) {
+          status.textContent = "Impossible de charger le détail de l’alerte.";
+          return;
+        }
+
+        const data = await res.json();
+        openModal(`Alerte #${id}`, data);
+        status.textContent = `Alerte #${id} chargée.`;
+      } catch (e) {
+        console.error(e);
+        status.textContent = "Erreur réseau lors du chargement de l’alerte.";
+      }
     }
 
     async function loadDashboard() {
