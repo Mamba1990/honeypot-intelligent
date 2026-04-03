@@ -14,7 +14,8 @@ import numpy as np
 sys.path.insert(0, "/app/ml")
 from feature_extraction import featurize_http, featurize_ssh_cowrie
 
-DB_PATH = "/db/incidents.db"
+DB_PATH   = "/db/incidents.db"
+POS_FILE  = "/db/collector_pos.json"  # ✅ Persistance des positions de lecture
 HTTP_LOG = "/web/logs/http_events.jsonl"
 COWRIE_LOG = "/cowrie/var/log/cowrie/cowrie.json"
 
@@ -63,6 +64,14 @@ HTTP_SENSITIVE_PATHS = [
 # SSH indicators
 SSH_POST_EXP_KW = ["wget", "curl", "chmod", "bash", "python", "nc ", "netcat", "perl", "sh "]
 SSH_RECON_KW = ["uname", "whoami", "id", "cat /etc/passwd", "ip a", "ifconfig", "ps ", "netstat"]
+
+# ✅ VALID_EVENTS SSH — aligné avec train_ssh.py
+SSH_VALID_EVENTS = {
+    "cowrie.login.failed",
+    "cowrie.login.success",
+    "cowrie.command.input",
+    "cowrie.command.failed",   # commandes inconnues de Cowrie
+}
 
 
 # ---------------- DB ----------------
@@ -350,12 +359,15 @@ def classify_ssh_label(ev: dict) -> str:
         return "ssh_login_failed"
     if etype == "cowrie.login.success":
         return "ssh_login_success"
-    if etype == "cowrie.command.input":
+    if etype in ("cowrie.command.input", "cowrie.command.failed"):
         cmd = (ev.get("input") or "").lower()
         if any(x in cmd for x in SSH_POST_EXP_KW):
             return "post_exploitation"
         if any(x in cmd for x in SSH_RECON_KW):
             return "recon"
+        # cowrie.command.failed = commande inconnue de Cowrie
+        if etype == "cowrie.command.failed":
+            return "ssh_command_failed"
         return "ssh_command"
     return "ssh_activity"
 
@@ -460,6 +472,17 @@ def compute_rba_ssh(ev: dict, fails_60s: int, ml_is_anomaly: int) -> tuple[int, 
     elif etype == "cowrie.login.success":
         threat = 20
         indicators.append("login_success")
+    elif etype == "cowrie.command.failed":
+        # ✅ Commande inconnue de Cowrie — signe d'un vrai attaquant
+        if any(k in cmd for k in SSH_POST_EXP_KW):
+            threat = 40
+            indicators.append("command_failed_post_exploitation")
+        elif any(k in cmd for k in SSH_RECON_KW):
+            threat = 25
+            indicators.append("command_failed_recon")
+        else:
+            threat = 30  # base=10 + threat=30 + ml_boost=20 = 60 -> seuil alerte atteint
+            indicators.append("command_failed_unknown")
     else:
         threat = 5
         indicators.append("ssh_activity")
@@ -490,6 +513,35 @@ def severity_from_risk(risk: int) -> int:
     return int(risk)
 
 
+# ---------------- Position persistence ----------------
+def load_positions() -> dict:
+    """Charge les positions de lecture depuis le disque.
+    Permet de reprendre exactement ou le collector s'est arrete
+    apres un redemarrage ou un docker compose up --build."""
+    try:
+        with open(POS_FILE, "r") as f:
+            pos = json.load(f)
+            print(f"[collector] positions chargees: http={pos.get('http',0)} ssh={pos.get('ssh',0)}")
+            return pos
+    except (FileNotFoundError, json.JSONDecodeError):
+        print("[collector] pas de positions sauvegardees — demarrage depuis la fin des logs")
+        return {"http": 0, "ssh": 0}
+
+def save_positions(http_pos: int, ssh_pos: int):
+    """Sauvegarde les positions courantes sur le disque."""
+    try:
+        with open(POS_FILE, "w") as f:
+            json.dump({"http": http_pos, "ssh": ssh_pos}, f)
+    except Exception as e:
+        print(f"[collector] erreur sauvegarde positions: {e}")
+
+def get_file_size(path: str) -> int:
+    """Retourne la taille du fichier ou 0 s'il n'existe pas."""
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return 0
+
 # ---------------- Main loop ----------------
 def main():
     init_db()
@@ -501,8 +553,21 @@ def main():
     print("[collector] ML SSH enabled :", ml_ssh_enabled(), "|", ML_SSH_MODEL_PATH)
     print(f"[collector] flood cap: max {MAX_INCIDENTS_PER_IP_60S} incidents/IP/{WINDOW_SECONDS}s")
 
-    http_pos = 0
-    ssh_pos = 0
+    # ✅ Charger les positions depuis le disque
+    # Si premier demarrage : partir de la fin des fichiers (ignorer anciens logs)
+    # Si redemarrage : reprendre exactement ou on s'etait arrete
+    _pos = load_positions()
+
+    # Premier demarrage (pas de POS_FILE) → partir de la FIN pour ne pas rejouer les anciens logs
+    if _pos["http"] == 0 and not os.path.exists(POS_FILE):
+        _pos["http"] = get_file_size(HTTP_LOG)
+        print(f"[collector] premier demarrage — HTTP pos initialisee a {_pos['http']} (fin du fichier)")
+    if _pos["ssh"] == 0 and not os.path.exists(POS_FILE):
+        _pos["ssh"] = get_file_size(COWRIE_LOG)
+        print(f"[collector] premier demarrage — SSH pos initialisee a {_pos['ssh']} (fin du fichier)")
+
+    http_pos = _pos["http"]
+    ssh_pos  = _pos["ssh"]
 
     http_hits = defaultdict(lambda: deque())
     ssh_fails = defaultdict(lambda: deque())
@@ -661,6 +726,8 @@ def main():
                     "category": label
                 })
 
+        # ✅ Sauvegarder les positions a chaque iteration
+        save_positions(http_pos, ssh_pos)
         time.sleep(2)
 
 

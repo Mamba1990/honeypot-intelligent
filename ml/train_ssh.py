@@ -14,7 +14,8 @@ MODEL_OUT = "model_ssh.joblib"
 VALID_EVENTS = {
     "cowrie.login.failed",
     "cowrie.login.success",
-    "cowrie.command.input"
+    "cowrie.command.input",
+    "cowrie.command.failed",   # ✅ commandes inconnues de Cowrie — vrai attaquant
 }
 
 # 🎯 mots clés utiles pour filtrer commandes vides
@@ -28,8 +29,8 @@ def is_valid_ssh_event(ev: dict) -> bool:
     if eventid not in VALID_EVENTS:
         return False
 
-    # ❌ ignorer commandes vides
-    if eventid == "cowrie.command.input":
+    # ❌ ignorer commandes vides (input et failed)
+    if eventid in ("cowrie.command.input", "cowrie.command.failed"):
         cmd = (ev.get("input") or "").strip()
         if len(cmd) < MIN_CMD_LENGTH:
             return False
