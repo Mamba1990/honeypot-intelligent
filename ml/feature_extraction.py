@@ -19,10 +19,10 @@ SUSPICIOUS_HTTP = [
 ]
 
 SENSITIVE_PATHS = [
-    "/admin", "/login", "/.env", "/wp-admin",
-    "/phpmyadmin", "/wp-login.php", "/render",
-    "/actuator", "/server-status", "/config",
-    "/upload",
+    "/admin", "/login", "/signin", "/auth",
+    "/.env", "/wp-admin", "/phpmyadmin", "/wp-login.php",
+    "/render", "/actuator", "/server-status", "/config",
+    "/upload", "/api/parse", "/api/search",
 ]
 
 # Patterns SSTI / template injection + Log4Shell
@@ -211,7 +211,8 @@ def featurize_http(evt: dict) -> list[float]:
 
 SSH_POST_EXP_KW = [
     "wget", "curl", "chmod", "bash", "python",
-    "nc ", "netcat", "perl", "sh ",
+    "nc ", "netcat", "perl", "sh ", "apt-get",
+    "apt ",  "pip ", "yum ",
 ]
 
 SSH_RECON_KW = [
@@ -222,7 +223,8 @@ SSH_RECON_KW = [
 # Patterns d'escalade de privileges
 SSH_PRIVESC_KW = [
     "sudo", "su ", "passwd", "useradd", "usermod",
-    "visudo", "/etc/sudoers", "chown root", "setuid",
+    "visudo", "/etc/sudoers", "chown root", "setuid", "docker",
+    "nsenter", "unshare",
 ]
 
 # Patterns de persistence
