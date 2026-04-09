@@ -1,305 +1,373 @@
-# 🐝 Honeypot Intelligent (SSH + HTTP + Machine Learning)
+# 🍯 Honeypot Intelligent — HTTP & SSH
 
-Projet de cybersécurité visant à concevoir un **honeypot intelligent multi-services** capable de :
+> Détection hybride d'intrusions par règles expertes et Machine Learning
 
-- attirer des attaquants
-- collecter leurs actions
-- analyser les tentatives d'intrusion
-- classifier les comportements malveillants
-- générer des alertes basées sur le risque
-
-Le système combine **honeypots, analyse par règles, scoring RBA et Machine Learning**.
+Projet de fin de formation en Cybersécurité & Systèmes d'Informations — **Jobintech Promotion 2026**  
+Réalisé par : **Hafsa Daoudim**
 
 ---
 
-# 📌 Objectifs du projet
+## 📌 Description
 
-Le projet vise à démontrer une architecture complète de détection d'attaques basée sur :
+Système honeypot intelligent multi-protocoles capable de :
 
-- Honeypots réseau
-- Collecte et centralisation de logs
-- Analyse comportementale
-- Détection hybride **Règles + Machine Learning**
-- API de consultation des incidents
-
----
-
-# 🏗 Architecture du système
-
+- **Capturer** le trafic malveillant HTTP et SSH en temps réel
+- **Classifier** les attaques par règles expertes (SQLi, XSS, LFI, XXE, SSTI, bruteforce...)
+- **Détecter** les comportements anormaux inconnus via Machine Learning (Isolation Forest)
+- **Scorer** chaque événement avec un Risk-Based Alerting (RBA) composite
+- **Alerter** et visualiser via une API REST et un dashboard temps réel
 
 ---
 
-# ⚙️ Technologies utilisées
+## 🏗️ Architecture
 
-## Honeypots
+```
+Attaquant
+    │
+    ├──► HTTP Honeypot (Flask :8081)  ──► http_events.jsonl ──┐
+    │                                                          │
+    └──► SSH Honeypot (Cowrie :2222)  ──► cowrie.json        ──┤
+                                                               │
+                                                     Collector (Règles + ML + RBA)
+                                                               │
+                                                         SQLite DB (/db/incidents.db)
+                                                               │
+                                                      API FastAPI (:8000)
+                                                               │
+                                                          Dashboard
+```
 
-- **Cowrie** → Honeypot SSH
-- **Webhoneypot Python** → Simulation service HTTP vulnérable
-
-## Analyse
-
-- Python
-- Machine Learning (**Isolation Forest**)
-- Risk-Based Alerting (**RBA**)
-
-## Backend
-
-- **FastAPI**
-
-## Base de données
-
-- **SQLite**
-
-## Containerisation
-
-- **Docker**
-- **Docker Compose**
+**Deux réseaux Docker distincts pour l'isolation :**
+- `honeypot-net` — zone exposée (cowrie, webhoneypot)
+- `internal-net` — zone interne (collector, api, db)
 
 ---
 
-# 📁 Structure du projet
+## ⚙️ Stack Technologique
 
+| Composant | Technologie | Rôle |
+|-----------|-------------|------|
+| Honeypot HTTP | Python / Flask | Capture requêtes HTTP malveillantes |
+| Honeypot SSH | Cowrie | Émulation SSH basse interaction |
+| Collector | Python 3.11 | Analyse, scoring RBA, persistance |
+| Machine Learning | scikit-learn IsolationForest | Détection d'anomalies non supervisée |
+| Base de données | SQLite | Stockage incidents, alertes, IOCs |
+| API REST | FastAPI | Exposition des données aux clients |
+| Dashboard | HTML / JS | Visualisation temps réel |
+| Orchestration | Docker Compose | Déploiement multi-conteneurs |
+
+---
+
+## 📁 Structure du Projet
+
+```
 honeypot-intelligent/
 │
 ├── api/
-│ ├── api.py
-│ └── Dockerfile
+│   ├── api.py                    # API FastAPI
+│   └── Dockerfile
 │
 ├── collector/
-│ ├── collector.py
-│ └── Dockerfile
+│   ├── collector.py              # Moteur d'analyse (règles + ML + RBA)
+│   └── Dockerfile
 │
 ├── cowrie/
-│ ├── cowrie.cfg
-│ └── userdb.txt
+│   ├── cowrie.cfg                # Configuration Cowrie
+│   └── userdb.txt                # Credentials acceptés par Cowrie
 │
 ├── webhoneypot/
-│ ├── app.py
-│ ├── logs/
-│ └── Dockerfile
+│   ├── app.py                    # Honeypot HTTP Flask
+│   └── Dockerfile
 │
 ├── ml/
-│ ├── feature_extraction.py
-│ ├── train_http.py
-│ ├── train_ssh.py
-│ ├── eval_http.py
-│ └── eval_ssh.py
+│   ├── feature_extraction.py     # Extraction features HTTP (16 dims) et SSH (12 dims)
+│   ├── train_http.py             # Entraînement modèle HTTP
+│   ├── train_ssh.py              # Entraînement modèle SSH
+│   ├── eval_http.py              # Évaluation modèle HTTP
+│   ├── eval_ssh.py               # Évaluation modèle SSH
+│   ├── model_http.joblib         # Modèle HTTP entraîné
+│   └── model_ssh.joblib          # Modèle SSH entraîné
+│
+├── traffic_generator/
+│   ├── http_generator.py         # Générateur trafic HTTP (normal/suspicious/mixed)
+│   └── ssh_log_generator.py      # Générateur trafic SSH avec cowrie.command.failed
 │
 ├── db/
-│ └── incidents.db
+│   └── incidents.db              # Base SQLite
 │
 ├── docker-compose.yml
-│
 └── README.md
-
+```
 
 ---
 
-# 🚀 Installation
+## 🚀 Installation et Démarrage
 
-## 1️⃣ Cloner le projet
+### Prérequis
+
+- Docker Desktop
+- Docker Compose v2+
+- Python 3.11+ (pour l'entraînement ML en local)
+
+### 1. Cloner le projet
 
 ```bash
 git clone https://github.com/TON_USERNAME/honeypot-intelligent.git
-
 cd honeypot-intelligent
+```
 
-## 1️⃣ Lancer le système
-
-Les services démarrent :
-
-
-| Service       | Port |
-| ------------- | ---- |
-| SSH Honeypot  | 2222 |
-| HTTP Honeypot | 8081 |
-| API           | 8000 |
-
-
-
- # ⚙️ Technologies utilisées
- ## SSH
+### 2. Lancer le système
 
 ```bash
- ssh root@localhost -p 2222
+docker compose up -d
+```
 
-Exemples de commandes :
+Services démarrés :
 
-whoami
-uname -a
-cat /etc/passwd
+| Service | Port | Description |
+|---------|------|-------------|
+| SSH Honeypot (Cowrie) | 2222 | Piège SSH |
+| HTTP Honeypot | 8081 | Piège HTTP |
+| API FastAPI | 127.0.0.1:8000 | API REST (localhost uniquement) |
 
-## HTTP
-
-Tester une injection SQL :
+### 3. Vérifier que tout fonctionne
 
 ```bash
+curl http://127.0.0.1:8000/health
+# → {"status":"ok"}
 
-curl "http://localhost:8081/login?user=%27%20OR%201%3D1"
+curl http://localhost:8081/
+# → <h3>It works.</h3>
+```
 
-Tester un XSS:
+---
+
+## 🎯 Entraînement du Modèle ML
+
+### Générer du trafic synthétique
+
 ```bash
+# Trafic HTTP normal
+docker compose --profile generator run --rm httpgen-normal
 
-curl "http://localhost:8081/search?q=%3Cscript%3Ealert(1)%3C/script%3E"
+# Trafic HTTP suspect
+docker compose --profile generator run --rm httpgen-suspicious
 
-# API
+# Trafic SSH suspect (inclut cowrie.command.failed)
+docker compose --profile generator run --rm sshgen-suspicious
+```
 
-Accéder aux données :
+### Entraîner les modèles
 
-Incidents
-GET /incidents
+```bash
+cd ml
+python3 train_http.py   # → model_http.joblib (16 features)
+python3 train_ssh.py    # → model_ssh.joblib  (12 features)
+```
 
-Exemple :
+### Évaluer les modèles
 
-http://localhost:8000/incidents
-Alertes
-GET /alerts
-http://localhost:8000/alerts
-Statistiques
-GET /stats
-IOCs
-GET /iocs/{incident_id}
-# Machine Learning
+```bash
+python3 eval_http.py    # Métriques + histogramme http_scores_hist.png
+python3 eval_ssh.py     # Métriques + histogramme ssh_scores_hist.png
+```
 
-Deux modèles sont entraînés :
+---
 
-HTTP
+## 🔬 Cas de Test Validés
 
-Détection d'anomalies dans les requêtes HTTP.
+### HTTP — SQLi UNION SELECT (règle pure)
 
-Features utilisées :
+```bash
+curl "http://localhost:8081/search?id=1'+UNION+SELECT+username,password+FROM+users--"
+# → http_command_injection | Score : 60 | ml_is_anomaly : 0
+```
 
-méthode HTTP
+### HTTP — SSTI avec bypass cooldown (ML pur)
 
-longueur de la requête
+```bash
+curl -X POST \
+  -A "ScannerProbe-TemplateEngine-Check-ABCDEFGHIJKLMNOPQRSTUVWXYZ-1234567890" \
+  "http://localhost:8081/render?tpl=%7B%7B7*7%7D%7D" \
+  -d "name=test"
+# → http_anomaly | Score : 70 | ml_score : -0.6258 | bypass cooldown actif
+```
 
-présence de signatures malveillantes
+### HTTP — XXE (hybride règle + ML)
 
-accès à des chemins sensibles
+```bash
+curl -X POST http://localhost:8081/api/parse \
+  -H "Content-Type: application/xml" \
+  -d '<!DOCTYPE x [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><x>&xxe;</x>'
+# → http_command_injection + http_anomaly + http_high_risk | Score : 100
+```
 
-longueur du User-Agent
+### SSH — Bruteforce (règle pure)
 
-Modèle utilisé :
+```bash
+ssh -p 2222 test@localhost -o NumberOfPasswordPrompts=10
+# 5+ échecs en 60s → ssh_bruteforce | Score : 50 | fails_60s : 5
+```
 
-Isolation Forest
-SSH
+### SSH — Escalade de privilèges via command.failed (ML pur)
 
-Analyse des comportements SSH :
+```bash
+ssh -p 2222 root@localhost
+# Puis dans le shell Cowrie :
+usermod -aG sudo hacker
+# → cowrie.command.failed → ssh_anomaly | Score : 60 | has_privesc=1.0
+```
 
-Features :
+### SSH — Hybride règle + ML (après réentraînement)
 
-nombre d'échecs d'authentification
+```bash
+# Même commande après réentraînement avec cowrie.command.failed
+# → base(10) + threat(30) + ml_boost(20) = 60 → ssh_anomaly
+# Règle seule = 40 (sous seuil) | ML seul = 30 (sous seuil) | Combiné = 60 ✅
+```
 
-type de commande
+---
 
-longueur de commande
+## 🧠 Machine Learning — Features
 
-fréquence des tentatives
+### Modèle HTTP (16 dimensions)
 
-🔎 Analyse des attaques
+| # | Feature | Signal détecté |
+|---|---------|----------------|
+| 2 | `has_suspicious_kw` | SQLi / XSS |
+| 9 | `has_template_syntax` | SSTI / Log4Shell |
+| 10 | `has_cmd_injection` | Command Injection |
+| 12 | `has_ssrf` | SSRF (169.254.169.254...) |
+| 13 | `has_file_inclusion` | LFI / RFI |
+| 14 | `has_xxe` | XXE |
+| 8 | `ua_entropy` | Scanners HTTP |
+| 11 | `query_entropy` | Payloads obfusqués |
 
-Le système combine :
+### Modèle SSH (12 dimensions)
 
-1️⃣ Détection par règles
+| # | Feature | Signal détecté |
+|---|---------|----------------|
+| 7 | `fails_60s` | Bruteforce fenêtre 60s |
+| 8 | `has_privesc` | Escalade de privilèges (usermod, sudo...) |
+| 9 | `has_persistence` | Persistence (crontab, authorized_keys...) |
+| 3 | `has_post_exploitation` | wget, curl, bash, nc |
+| 10 | `cmd_entropy` | Commandes obfusquées |
 
-Exemples :
+### Seuils de décision
 
-'or 1=1
-<script>
-union select
-../
+```
+ML_CRITICAL_SCORE = -0.62   → bypass cooldown http_anomaly
+RBA_ALERT_MED     = 60      → http_anomaly, ssh_anomaly, ssh_bruteforce...
+RBA_ALERT_HIGH    = 80      → http_high_risk
+COOLDOWN          = 60s     → anti-spam entre alertes identiques
+```
 
-SSH :
+---
 
-wget
-curl
-bash
-netcat
-2️⃣ Risk Based Alerting (RBA)
+## 📊 API REST
 
-Score calculé :
+Base URL : `http://127.0.0.1:8000`
 
-risk = base + threat + frequency + asset + indicators + ml_boost
-3️⃣ Machine Learning
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| GET | `/health` | Statut du service |
+| GET | `/dashboard` | Données agrégées dashboard |
+| GET | `/dashboard-data` | KPI + top IPs + catégories |
+| GET | `/incidents` | Liste paginée des incidents |
+| GET | `/incidents/{id}` | Détail d'un incident |
+| GET | `/alerts` | Liste des alertes par sévérité |
+| GET | `/alerts/{id}` | Détail d'une alerte avec RBA |
+| GET | `/stats` | Statistiques globales |
+| GET | `/iocs/{incident_id}` | IOCs associés à un incident |
+| GET | `/ml/metrics` | Métriques des modèles ML |
 
-Détection d'anomalies pour identifier des attaques inconnues.
+### Exemple d'alerte
 
-📦 Docker
-
-Chaque composant fonctionne dans un container :
-
-cowrie
-webhoneypot
-collector
-api
-
-Orchestration :
-
-docker-compose
-📈 Exemple d'alerte
+```json
 {
-"id": 45,
-"timestamp": "2026-02-16T00:23:26.563351Z",
-"source_ip": "172.20.0.1",
-"alert_type": "http_high_risk",
-"severity": 80,
-"details": {
-"rba": {
-"risk": 80,
-"components": {
-"base": 10,
-"threat": 0,
-"frequency": 20,
-"asset": 20,
-"indicators": 10,
-"ml_boost": 20
+  "id": 3367,
+  "timestamp": "2026-03-26T21:56:33Z",
+  "source_ip": "172.20.0.1",
+  "alert_type": "http_command_injection",
+  "severity": 60,
+  "details": {
+    "rba": {
+      "risk": 60,
+      "components": {
+        "base": 10,
+        "threat": 40,
+        "frequency": 0,
+        "asset": 0,
+        "indicators": 10,
+        "ml_boost": 0
+      }
+    },
+    "reason": "rule_match_command_injection"
+  }
 }
-},
-"event": {
-"path": "/login",
-"query": "user=' OR 1=1"
-}
-}
-}
-⚠️ Limites du projet
+```
 
-dataset ML limité
+---
 
-SQLite non scalable
+## 🔒 Sécurité Réseau
 
-pas de queue d'événements
+Segmentation réseau via Docker Compose — isolation entre zone exposée et zone interne :
 
-dashboard minimal
+```yaml
+networks:
+  honeypot-net:
+    driver: bridge        # zone exposée — cowrie, webhoneypot
+  internal-net:
+    driver: bridge        # zone interne — collector, api
+```
 
-peu de tests automatisés
+Vérifier l'isolation :
 
-# Améliorations futures
+```bash
+docker exec cowrie python3 -c "
+import urllib.request
+try:
+    urllib.request.urlopen('http://api:8000/health', timeout=3)
+    print('PROBLEME')
+except:
+    print('OK : isolation confirmee')
+"
+# → OK : isolation confirmee ✅
+```
 
-intégration ELK Stack
+---
 
-dashboard graphique
+## ⚠️ Limites Identifiées
 
-ajout honeypot FTP / SMB
+- Dataset ML synthétique — réentraînement avec vrai trafic recommandé progressivement
+- SQLite non adapté à la production → migration PostgreSQL prévue
+- Pas d'authentification API ni HTTPS en l'état actuel
+- Couverture limitée à HTTP et SSH (FTP, Telnet, RDP non couverts)
 
-base PostgreSQL
+---
 
-modèles ML plus avancés
+## 🚀 Améliorations Futures
 
-🎓 Contexte académique
+- [ ] Migration vers PostgreSQL
+- [ ] Notifications temps réel (email, Slack, webhook)
+- [ ] Intégration SIEM (Elasticsearch / Kibana)
+- [ ] Authentification API + HTTPS
+- [ ] Extension vers FTP, Telnet, RDP, SMTP
+- [ ] Déploiement cloud multi-régions (AWS / GCP / Azure)
+- [ ] Intégration Threat Intelligence (MISP, VirusTotal)
+- [ ] Ajout de `docker`, `apt-get`, `yum` aux keywords SSH
 
-Projet réalisé dans le cadre d'une formation cybersécurité.
+---
 
-Objectif :
+## 🎓 Contexte Académique
 
-concevoir un honeypot intelligent capable de détecter et analyser les attaques réseau.
+Projet de fin de formation réalisé dans le cadre de la filière  
+**Cybersécurité & Systèmes d'Informations — Jobintech Promotion 2026**
 
-📜 Licence
+**Auteure :** Hafsa Daoudim
 
-Projet académique / éducatif.
+---
 
-👨‍💻 Auteur
+## 📜 Licence
 
-Hafsa Daoudim
-
-Projet Honeypot Intelligent
-Cybersécurité & Machine Learning
+Projet académique et éducatif — usage non commercial.
