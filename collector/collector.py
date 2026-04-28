@@ -1,5 +1,11 @@
 import os
 import sys
+
+# ✅ feature_extraction.py est copié dans /app via le Dockerfile
+# sys.path pointe vers /app pour garantir la cohérence entraînement/inférence
+sys.path.insert(0, "/app")
+sys.path.insert(0, "/app/ml")  # fallback si monté via volume
+
 import json
 import sqlite3
 import time
@@ -11,7 +17,6 @@ import numpy as np
 
 # ✅ Import des features depuis feature_extraction.py
 # Même vecteur utilisé à l'entraînement ET en inférence → cohérence garantie
-sys.path.insert(0, "/app/ml")
 from feature_extraction import featurize_http, featurize_ssh_cowrie
 
 DB_PATH   = "/db/incidents.db"
@@ -33,7 +38,7 @@ ALERT_COOLDOWN_SECONDS = 60
 _last_alert_time = {}  # (ip, alert_type) -> last_time_epoch
 
 # ✅ Cap flood : max incidents enregistrés par IP par fenêtre de 60s
-MAX_INCIDENTS_PER_IP_60S = 10
+MAX_INCIDENTS_PER_IP_60S = 100
 _http_incident_counts = defaultdict(lambda: deque())
 _ssh_incident_counts  = defaultdict(lambda: deque())
 

@@ -9,6 +9,8 @@ services:
       - cowrie-data:/cowrie/var
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
       - ./cowrie/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
+    networks:
+      - honeypot-net
 
   webhoneypot:
     build: ./webhoneypot
@@ -18,6 +20,8 @@ services:
       - "8081:8081"
     volumes:
       - webhoneypot-logs:/app/logs
+    networks:
+      - honeypot-net
 
   collector:
     build: ./collector
@@ -33,6 +37,9 @@ services:
       - cowrie-data:/cowrie/var:ro
       - ./db:/db
       - ./ml:/app/ml:ro
+    networks:
+      - honeypot-net    # pour lire les logs des honeypots
+      - internal-net    # pour persister en DB et communiquer avec l'API
 
   api:
     build: ./api
@@ -41,11 +48,13 @@ services:
     depends_on:
       - collector
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"    # accessible uniquement en local
     volumes:
       - ./db:/db:ro
     environment:
       - API_KEY=honeypot-secret-key
+    networks:
+      - internal-net
 
   httpgen-normal:
     build:
@@ -62,6 +71,8 @@ services:
       COUNT: 300
       DELAY_MIN: 0.1
       DELAY_MAX: 0.5
+    networks:
+      - honeypot-net
 
   httpgen-suspicious:
     build:
@@ -78,6 +89,8 @@ services:
       COUNT: 200
       DELAY_MIN: 0.05
       DELAY_MAX: 0.2
+    networks:
+      - honeypot-net
 
   sshgen-normal:
     build:
@@ -94,6 +107,8 @@ services:
       OUT: /cowrie/var/log/cowrie/cowrie.json
     volumes:
       - cowrie-data:/cowrie/var
+    networks:
+      - honeypot-net
 
   sshgen-suspicious:
     build:
@@ -110,7 +125,15 @@ services:
       OUT: /cowrie/var/log/cowrie/cowrie.json
     volumes:
       - cowrie-data:/cowrie/var
+    networks:
+      - honeypot-net
 
 volumes:
   webhoneypot-logs:
   cowrie-data:
+
+networks:
+  honeypot-net:
+    driver: bridge
+  internal-net:
+    driver: bridge            # zone interne — bloque tout trafic sortant vers Internet
