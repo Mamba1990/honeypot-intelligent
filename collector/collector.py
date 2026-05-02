@@ -520,17 +520,32 @@ def severity_from_risk(risk: int) -> int:
 
 # ---------------- Position persistence ----------------
 def load_positions() -> dict:
-    """Charge les positions de lecture depuis le disque.
-    Permet de reprendre exactement ou le collector s'est arrete
-    apres un redemarrage ou un docker compose up --build."""
+    """Charge les positions et vérifie la cohérence avec la taille des fichiers.
+    Si position > taille fichier → rotation détectée → reset à 0."""
     try:
         with open(POS_FILE, "r") as f:
             pos = json.load(f)
-            print(f"[collector] positions chargees: http={pos.get('http',0)} ssh={pos.get('ssh',0)}")
-            return pos
     except (FileNotFoundError, json.JSONDecodeError):
-        print("[collector] pas de positions sauvegardees — demarrage depuis la fin des logs")
+        print("[collector] pas de positions sauvegardees — demarrage depuis 0")
         return {"http": 0, "ssh": 0}
+
+    # ✅ Détection de rotation : si position > taille → fichier recréé
+    http_size = get_file_size(HTTP_LOG)
+    ssh_size  = get_file_size(COWRIE_LOG)
+
+    http_pos = pos.get("http", 0)
+    ssh_pos  = pos.get("ssh", 0)
+
+    if http_pos > http_size:
+        print(f"[collector] ⚠️  rotation HTTP détectée (pos={http_pos} > size={http_size}) → reset à 0")
+        http_pos = 0
+
+    if ssh_pos > ssh_size:
+        print(f"[collector] ⚠️  rotation SSH détectée (pos={ssh_pos} > size={ssh_size}) → reset à 0")
+        ssh_pos = 0
+
+    print(f"[collector] positions chargees: http={http_pos} ssh={ssh_pos}")
+    return {"http": http_pos, "ssh": ssh_pos}
 
 def save_positions(http_pos: int, ssh_pos: int):
     """Sauvegarde les positions courantes sur le disque."""
@@ -672,6 +687,9 @@ def main():
             ts = ev.get("timestamp") or (datetime.utcnow().isoformat() + "Z")
             ip = ev.get("src_ip") or ev.get("srcip") or ev.get("src") or ""
             etype = ev.get("eventid", "")
+
+            if etype not in SSH_VALID_EVENTS:
+                continue
 
             fails_60s = 0
             if ip:
