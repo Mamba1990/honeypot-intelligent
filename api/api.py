@@ -2,6 +2,7 @@ import json
 import sqlite3
 import os
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Depends, Security
 from fastapi.responses import FileResponse
@@ -93,13 +94,40 @@ def dashboard():
     return FileResponse(str(DASHBOARD_HTML))
 
 
+# ── MODIFIED: added optional filters category, service, source_ip, ml_only ──
 @app.get("/incidents")
-def list_incidents(limit: int = 50, _=Depends(check_api_key)):
+def list_incidents(
+    limit: int = 50,
+    category: Optional[str] = None,
+    service: Optional[str] = None,
+    source_ip: Optional[str] = None,
+    ml_only: Optional[int] = None,
+    _=Depends(check_api_key)
+):
+    conditions = []
+    params = []
+
+    if category:
+        conditions.append("category = ?")
+        params.append(category)
+    if service:
+        conditions.append("service = ?")
+        params.append(service)
+    if source_ip:
+        conditions.append("source_ip = ?")
+        params.append(source_ip)
+    if ml_only == 1 and table_has_column("incidents", "ml_is_anomaly"):
+        conditions.append("ml_is_anomaly = 1")
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(limit)
+
     rows = query_db(
-        "SELECT id, timestamp, source_ip, service, category, score FROM incidents ORDER BY id DESC LIMIT ?",
-        (limit,)
+        f"SELECT id, timestamp, source_ip, service, category, score, ml_is_anomaly "
+        f"FROM incidents {where} ORDER BY id DESC LIMIT ?",
+        tuple(params)
     )
-    return {"items": rows}
+    return {"incidents": rows, "total": len(rows)}
 
 
 @app.get("/incidents/{incident_id}")
@@ -107,21 +135,36 @@ def incident_detail(incident_id: int, _=Depends(check_api_key)):
     rows = query_db("SELECT * FROM incidents WHERE id = ?", (incident_id,))
     if not rows:
         raise HTTPException(status_code=404, detail="not found")
-
     row = rows[0]
     row["raw"] = parse_json_if_possible(row.get("raw"))
     return row
 
 
+# ── MODIFIED: added optional filter alert_type ──
 @app.get("/alerts")
-def list_alerts(limit: int = 50, _=Depends(check_api_key)):
+def list_alerts(
+    limit: int = 50,
+    alert_type: Optional[str] = None,
+    _=Depends(check_api_key)
+):
+    conditions = []
+    params = []
+
+    if alert_type:
+        conditions.append("alert_type = ?")
+        params.append(alert_type)
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(limit)
+
     rows = query_db(
-        "SELECT id, timestamp, source_ip, alert_type, severity, details FROM alerts ORDER BY id DESC LIMIT ?",
-        (limit,)
+        f"SELECT id, timestamp, source_ip, alert_type, severity, details "
+        f"FROM alerts {where} ORDER BY id DESC LIMIT ?",
+        tuple(params)
     )
     for r in rows:
         r["details"] = parse_json_if_possible(r.get("details"))
-    return {"items": rows}
+    return {"alerts": rows, "total": len(rows)}
 
 
 @app.get("/alerts/{alert_id}")
@@ -129,7 +172,6 @@ def alert_detail(alert_id: int, _=Depends(check_api_key)):
     rows = query_db("SELECT * FROM alerts WHERE id = ?", (alert_id,))
     if not rows:
         raise HTTPException(status_code=404, detail="not found")
-
     row = rows[0]
     row["details"] = parse_json_if_possible(row.get("details"))
     return row
@@ -184,14 +226,14 @@ def dashboard_data(_=Depends(check_api_key)):
     }
 
     total_incidents = query_db("SELECT COUNT(*) as cnt FROM incidents")
-    total_alerts = query_db("SELECT COUNT(*) as cnt FROM alerts")
-    http_incidents = query_db("SELECT COUNT(*) as cnt FROM incidents WHERE service = 'http'")
-    ssh_incidents = query_db("SELECT COUNT(*) as cnt FROM incidents WHERE service = 'ssh'")
+    total_alerts    = query_db("SELECT COUNT(*) as cnt FROM alerts")
+    http_incidents  = query_db("SELECT COUNT(*) as cnt FROM incidents WHERE service = 'http'")
+    ssh_incidents   = query_db("SELECT COUNT(*) as cnt FROM incidents WHERE service = 'ssh'")
 
     summary["total_incidents"] = total_incidents[0]["cnt"] if total_incidents else 0
-    summary["total_alerts"] = total_alerts[0]["cnt"] if total_alerts else 0
-    summary["http_incidents"] = http_incidents[0]["cnt"] if http_incidents else 0
-    summary["ssh_incidents"] = ssh_incidents[0]["cnt"] if ssh_incidents else 0
+    summary["total_alerts"]    = total_alerts[0]["cnt"]    if total_alerts    else 0
+    summary["http_incidents"]  = http_incidents[0]["cnt"]  if http_incidents  else 0
+    summary["ssh_incidents"]   = ssh_incidents[0]["cnt"]   if ssh_incidents   else 0
 
     if table_has_column("incidents", "ml_is_anomaly"):
         ml_rows = query_db("SELECT COUNT(*) as cnt FROM incidents WHERE ml_is_anomaly = 1")
@@ -201,31 +243,23 @@ def dashboard_data(_=Depends(check_api_key)):
         SELECT source_ip, COUNT(*) as cnt
         FROM incidents
         WHERE source_ip IS NOT NULL AND source_ip != ''
-        GROUP BY source_ip
-        ORDER BY cnt DESC
-        LIMIT 8
+        GROUP BY source_ip ORDER BY cnt DESC LIMIT 8
     """)
 
     top_categories = query_db("""
         SELECT category, COUNT(*) as cnt
         FROM incidents
-        GROUP BY category
-        ORDER BY cnt DESC
-        LIMIT 8
+        GROUP BY category ORDER BY cnt DESC LIMIT 8
     """)
 
     recent_incidents = query_db("""
-        SELECT id, timestamp, source_ip, service, category, score
-        FROM incidents
-        ORDER BY id DESC
-        LIMIT 10
+        SELECT id, timestamp, source_ip, service, category, score, ml_is_anomaly
+        FROM incidents ORDER BY id DESC LIMIT 10
     """)
 
     recent_alerts = query_db("""
         SELECT id, timestamp, source_ip, alert_type, severity, details
-        FROM alerts
-        ORDER BY id DESC
-        LIMIT 10
+        FROM alerts ORDER BY id DESC LIMIT 10
     """)
     for r in recent_alerts:
         r["details"] = parse_json_if_possible(r.get("details"))
@@ -233,9 +267,7 @@ def dashboard_data(_=Depends(check_api_key)):
     alert_types = query_db("""
         SELECT alert_type, COUNT(*) as cnt
         FROM alerts
-        GROUP BY alert_type
-        ORDER BY cnt DESC
-        LIMIT 8
+        GROUP BY alert_type ORDER BY cnt DESC LIMIT 8
     """)
 
     return {

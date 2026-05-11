@@ -9,6 +9,7 @@ from feature_extraction import featurize_ssh_cowrie
 
 DATA_PATH  = os.path.join("data", "cowrie.json")
 MODEL_PATH = "model_ssh.joblib"
+ML_METRICS_PATH = "/db/ml_metrics.json"
 
 # ✅ Même filtre que train_ssh.py — sans déduplication
 VALID_EVENTS = {
@@ -87,6 +88,41 @@ def pretty_event(ev: dict) -> str:
     return " | ".join(parts)
 
 
+def save_metrics(X, scores, preds, anomaly_ratio):
+    """Sauvegarde les métriques SSH dans /db/ml_metrics.json pour l'API."""
+    metrics_ssh = {
+        "total": int(len(X)),
+        "anomalies": int((preds == -1).sum()),
+        "normaux": int((preds == 1).sum()),
+        "anomaly_ratio": round(float(anomaly_ratio), 4),
+        "score_mean": round(float(scores.mean()), 4),
+        "score_min":  round(float(scores.min()),  4),
+        "score_max":  round(float(scores.max()),  4),
+        "percentile_1":  round(float(np.percentile(scores, 1)),  4),
+        "percentile_5":  round(float(np.percentile(scores, 5)),  4),
+        "percentile_10": round(float(np.percentile(scores, 10)), 4),
+        "percentile_50": round(float(np.percentile(scores, 50)), 4),
+        "percentile_95": round(float(np.percentile(scores, 95)), 4),
+        "ml_critical_score": -0.62,
+    }
+
+    # Lire l'existant (HTTP peut déjà avoir été calculé)
+    existing = {}
+    try:
+        with open(ML_METRICS_PATH, "r") as f:
+            existing = json.load(f)
+    except Exception:
+        pass
+
+    existing["ssh"] = metrics_ssh
+
+    os.makedirs(os.path.dirname(ML_METRICS_PATH), exist_ok=True)
+    with open(ML_METRICS_PATH, "w") as f:
+        json.dump(existing, f, indent=2, ensure_ascii=False)
+
+    print(f"\n✅ ml_metrics.json mis à jour (ssh) → {ML_METRICS_PATH}")
+
+
 def main():
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(f"{MODEL_PATH} introuvable. Lance: python3 train_ssh.py")
@@ -140,6 +176,9 @@ def main():
     plt.tight_layout()
     plt.savefig("ssh_scores_hist.png")
     print("\nSaved graph -> ssh_scores_hist.png")
+
+    # ✅ Sauvegarde métriques pour l'API /ml/metrics
+    save_metrics(X, scores, preds, anomaly_ratio)
 
 
 if __name__ == "__main__":
