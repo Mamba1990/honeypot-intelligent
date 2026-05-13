@@ -8,11 +8,11 @@ from feature_extraction import featurize_http
 
 DATA_PATH  = os.path.join("data", "http_events.jsonl")
 MODEL_PATH = "model_http.joblib"
-#ML_METRICS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ml_metrics.json")
-ML_METRICS_PATH = "/db/ml_metrics.json"
+ML_METRICS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ml_metrics.json")
+#ML_METRICS_PATH = "/db/ml_metrics.json"
 
-# ✅ Même filtre que train_http.py — retire le bruit inutile
-# ❌ Pas de déduplication — on veut la vraie distribution de production
+#  Même filtre que train_http.py — retire le bruit inutile
+#  Pas de déduplication — on veut la vraie distribution de production
 BORING_PATHS = {
     "/", "/index.html", "/about", "/contact", "/api/health"
 }
