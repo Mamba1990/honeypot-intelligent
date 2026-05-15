@@ -8,9 +8,11 @@ from feature_extraction import featurize_http
 
 DATA_PATH  = os.path.join("data", "http_events.jsonl")
 MODEL_PATH = "model_http.joblib"
+ML_METRICS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ml_metrics.json")
+#ML_METRICS_PATH = "/db/ml_metrics.json"
 
-# ✅ Même filtre que train_http.py — retire le bruit inutile
-# ❌ Pas de déduplication — on veut la vraie distribution de production
+#  Même filtre que train_http.py — retire le bruit inutile
+#  Pas de déduplication — on veut la vraie distribution de production
 BORING_PATHS = {
     "/", "/index.html", "/about", "/contact", "/api/health"
 }
@@ -85,6 +87,41 @@ def load_X():
     return np.array(X, dtype=float), raw
 
 
+def save_metrics(n, scores, preds, anomaly_ratio):
+    """Sauvegarde les métriques HTTP dans /db/ml_metrics.json pour l'API."""
+    metrics_http = {
+        "total": int(n),
+        "anomalies": int((preds == -1).sum()),
+        "normaux": int((preds == 1).sum()),
+        "anomaly_ratio": round(float(anomaly_ratio), 4),
+        "score_mean": round(float(scores.mean()), 4),
+        "score_min":  round(float(scores.min()),  4),
+        "score_max":  round(float(scores.max()),  4),
+        "percentile_1":  round(float(np.percentile(scores, 1)),  4),
+        "percentile_5":  round(float(np.percentile(scores, 5)),  4),
+        "percentile_10": round(float(np.percentile(scores, 10)), 4),
+        "percentile_50": round(float(np.percentile(scores, 50)), 4),
+        "percentile_95": round(float(np.percentile(scores, 95)), 4),
+        "ml_critical_score": -0.62,
+    }
+
+    # Lire l'existant (SSH peut déjà avoir été calculé)
+    existing = {}
+    try:
+        with open(ML_METRICS_PATH, "r") as f:
+            existing = json.load(f)
+    except Exception:
+        pass
+
+    existing["http"] = metrics_http
+
+    os.makedirs(os.path.dirname(ML_METRICS_PATH), exist_ok=True)
+    with open(ML_METRICS_PATH, "w") as f:
+        json.dump(existing, f, indent=2, ensure_ascii=False)
+
+    print(f"\n✅ ml_metrics.json mis à jour (http) → {ML_METRICS_PATH}")
+
+
 def main():
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError("model_http.joblib introuvable. Lance train_http.py d'abord.")
@@ -150,6 +187,9 @@ def main():
     plt.tight_layout()
     plt.savefig("http_scores_hist.png")
     print("\nSaved graph -> http_scores_hist.png")
+
+    # ✅ Sauvegarde métriques pour l'API /ml/metrics
+    save_metrics(n, scores, preds, anomaly_ratio)
 
 
 if __name__ == "__main__":

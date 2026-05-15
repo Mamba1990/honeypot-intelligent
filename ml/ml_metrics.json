@@ -1,0 +1,17 @@
+{
+  "http": {
+    "total": 6094,
+    "anomalies": 839,
+    "normaux": 5255,
+    "anomaly_ratio": 0.1377,
+    "score_mean": -0.5181,
+    "score_min": -0.6925,
+    "score_max": -0.3938,
+    "percentile_1": -0.6856,
+    "percentile_5": -0.6435,
+    "percentile_10": -0.6139,
+    "percentile_50": -0.508,
+    "percentile_95": -0.4077,
+    "ml_critical_score": -0.62
+  }
+}

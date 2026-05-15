@@ -369,5 +369,3 @@ Projet de fin de formation réalisé dans le cadre de la filière
 ---
 
 ## 📜 Licence
-
-Projet académique et éducatif — usage non commercial.
