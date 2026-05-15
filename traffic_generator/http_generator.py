@@ -9,7 +9,7 @@ COUNT = int(os.getenv("COUNT", "300"))
 DELAY_MIN = float(os.getenv("DELAY_MIN", "0.3"))
 DELAY_MAX = float(os.getenv("DELAY_MAX", "2.5"))
 
-# ✅ Paths normaux qui passent le filtre is_boring_http_event()
+# Paths normaux qui passent le filtre is_boring_http_event()
 # → ont une query, un body ou un path non-banal
 NORMAL_PATHS_GET = [
     "/login?user=john",
