@@ -11,7 +11,7 @@ DATA_PATH  = os.path.join("data", "cowrie.json")
 MODEL_PATH = "model_ssh.joblib"
 ML_METRICS_PATH = "/db/ml_metrics.json"
 
-# ✅ Même filtre que train_ssh.py — sans déduplication
+#Same filter as train_ssh.py, without deduplication
 VALID_EVENTS = {
     "cowrie.login.failed",
     "cowrie.login.success",

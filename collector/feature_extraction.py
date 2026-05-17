@@ -108,7 +108,7 @@ def _string_entropy(s: str) -> float:
     return float(min(entropy / 6.57, 1.0))
 
 
-# ── HTTP featurizer ───────────────────────────────────────────────────────────
+# HTTP featurizer #
 
 def featurize_http(evt: dict) -> list[float]:
     """
@@ -207,7 +207,7 @@ def featurize_http(evt: dict) -> list[float]:
     ]
 
 
-# ── SSH (Cowrie) detection dictionaries ──────────────────────────────────────
+# SSH (Cowrie) detection dictionaries #
 
 # Commands indicating the attacker is establishing persistence or exfiltrating data
 SSH_POST_EXP_KW = [
@@ -237,7 +237,7 @@ SSH_PERSIST_KW = [
 ]
 
 
-# ── SSH featurizer ────────────────────────────────────────────────────────────
+# SSH featurizer #
 
 def featurize_ssh_cowrie(ev: dict, fails_60s: int = 0) -> list[float]:
     """
