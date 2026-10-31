@@ -454,3 +454,13 @@ Academic and educational project, non-commercial use only.
 
 **Hafsa Daoudim** — Cybersecurity & Machine Learning
 Jobintech, Class of 2026
+
+
+## 📬 Contact
+
+**Hafsa Daoudim**
+
+- Email: hafsa.daoudim@gmail.com
+- GitHub: [@Mamba1990](https://github.com/Mamba1990)
+- Portfolio: https://hafsa-daoudim.gitlab.io/#hero
+
